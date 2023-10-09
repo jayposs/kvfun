@@ -37,13 +37,6 @@ type SortKey struct {
 	Dir int    `json:"dir"`
 }
 
-const (
-	Asc int = iota
-	Desc
-	AscI  // int
-	DescI // int
-)
-
 // QryRequest is used to filter and sort records.
 // Parms with nil or empty string value are ignored.
 type QryRequest struct {

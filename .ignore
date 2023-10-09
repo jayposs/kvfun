@@ -1,0 +1,13 @@
+# Ignore all
+#*
+
+# Unignore all with extensions, binary still excluded
+#!*.*
+#!.ignore
+
+# Unignore all dirs
+#!*/
+
+*/.db
+
+#*/.txt

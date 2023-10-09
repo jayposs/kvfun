@@ -87,7 +87,7 @@ func loadData() {
 			St:      data[i][3],
 			Zip:     data[i][4],
 		}
-		if rec.St == "TX" {
+		if rec.St == "TX" || rec.St == "FL" {
 			rec.CompanyId = 1
 		} else {
 			rec.CompanyId = 2

@@ -3,16 +3,12 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 
 	"kvfun/kvf"
 )
-
-var baseURL string = "http://localhost:8000/"
 
 var httpClient *http.Client
 
@@ -52,7 +48,7 @@ func get1() {
 		BktName: bktName,
 		Key:     "5c7ee97dc58bd17d64b36c66",
 	}
-	resp, err := run("getone", get1Req)
+	resp, err := kvf.Run(httpClient, "getone", get1Req)
 	if err != nil {
 		panic("getone  request failed")
 	}
@@ -71,7 +67,7 @@ func get() {
 			"5ff357d8362a3335e5fc2ee3",
 		},
 	}
-	resp, err := run("get", getReq)
+	resp, err := kvf.Run(httpClient, "get", getReq)
 	if err != nil {
 		panic("get  request failed")
 	}
@@ -87,7 +83,7 @@ func qryAll() {
 	qryReq := kvf.QryRequest{ // if only BktName parm is specified, all recs in key order are returned
 		BktName: bktName,
 	}
-	resp, err := run("qry", qryReq)
+	resp, err := kvf.Run(httpClient, "qry", qryReq)
 	if err != nil {
 		panic("qry all request failed")
 	}
@@ -111,11 +107,11 @@ func qry() {
 			{Fld: "companyId", Op: kvf.EqualTo, ValInt: 2},
 		},
 		SortFlds: []kvf.SortKey{
-			{Fld: "city", Dir: kvf.Desc},   // string desc
-			{Fld: "address", Dir: kvf.Asc}, // string asc
+			{Fld: "city", Dir: kvf.DescStr},
+			{Fld: "address", Dir: kvf.AscStr},
 		},
 	}
-	resp, err := run("qry", qryReq)
+	resp, err := kvf.Run(httpClient, "qry", qryReq)
 	if err != nil {
 		panic("qry request failed")
 	}
@@ -125,49 +121,8 @@ func qry() {
 	for i, rec := range resp.Recs {
 		json.Unmarshal(rec, &locRecs[i])
 		log.Printf("%+v\n", locRecs[i])
-	}
-}
-
-// format JSON in easy to view format
-func fmtJSON(jsonContent []byte) string {
-	var out bytes.Buffer
-	json.Indent(&out, jsonContent, "", "  ")
-	return out.String()
-}
-
-// Run method executes the api request using the provided payload.
-func run(op string, payload interface{}) (*kvf.Response, error) {
-	reqUrl := baseURL + op
-	jsonContent, err := json.Marshal(&payload) // -> []byte
-
-	//log.Println("--- client sending ---")
-	//log.Println(fmtJSON(jsonContent))
-
-	reqBody := bytes.NewReader(jsonContent) // -> io.Reader
-
-	req, err := http.NewRequest("POST", reqUrl, reqBody)
-	req.Header.Add("Content-Type", "application/json")
-
-	resp, doErr := httpClient.Do(req)
-	defer func() {
-		if doErr == nil {
-			resp.Body.Close()
+		if i > 20 {
+			break
 		}
-	}()
-	if resp.StatusCode != http.StatusOK || doErr != nil {
-		log.Println("Request Failed, Status:", resp.StatusCode, " ", resp.Status, " - ", doErr, " --- XXX")
-		return nil, doErr
 	}
-	result, err := io.ReadAll(resp.Body) // -> []byte
-	if err != nil {
-		log.Println("Read Http Response.Body Failed:", err)
-	}
-
-	//log.Println("--- client receiving ---")
-	//log.Println(fmtJSON(result))
-
-	kvfResp := new(kvf.Response)
-	err = json.Unmarshal(result, kvfResp)
-
-	return kvfResp, err
 }

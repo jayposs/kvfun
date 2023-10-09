@@ -11,6 +11,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+var dbPath = "/home/jay/data/kvftest.db"
 var db *bolt.DB
 
 func main() {
@@ -18,7 +19,7 @@ func main() {
 
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
-	db, err = bolt.Open("test.db", 0600, nil)
+	db, err = bolt.Open(dbPath, 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
