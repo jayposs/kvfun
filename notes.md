@@ -33,7 +33,7 @@ const (
 
 // NOTE - The Op code determines if ValStr or ValInt is used for comparison
 type FindCondition struct {
-	Fld    string // fld in Rec containing compare value
+	Fld    string // json field name in Rec containing compare value
 	Op     int    // see constants above
 	ValStr string // for Ops: Matches, StartsWith, Contains, LessThanStr, GreaterThanStr
 	ValInt int    // for Ops: EqualTo, LessThan, GreaterThan
@@ -58,7 +58,7 @@ BoltDB only allows 1 program to open the database file, but allows for multiple 
 
 Currently the Response object created by handler funcs is json.Marshalled by the http handler func in the server pgm. References to db values cannot be in the Response.Recs after the db transaction has ended. Therefore handler funcs make a copy of each db val and save the copy in the Response. If the copy step is causing delayed responses, the logic could be changed to include the Response marshal step in the handler funcs. This change does cause some complications, but nothing major.
 
-There are a number of "good to have" features that could be added, but that would make it more complex, such as:  
+There are a number of "good to have" features that could be added, but would make it more complex, such as:  
 * Sorting currently only allows for string and int types. Add other types.
 * Secondary Indexing scheme (for large semi static data sets)  
 * Finding with both and/or capability (currently only provides "and")

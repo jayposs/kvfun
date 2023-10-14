@@ -1,3 +1,7 @@
+// The rec.go file contains funcs that perform actions using a record - []byte.
+// Funcs recGetStr and recGetInt return a field's value from the record.
+// Func recFind determines if the record meets specified FindConditions.
+
 package kvf
 
 import (
@@ -7,6 +11,8 @@ import (
 
 	"github.com/valyala/fastjson"
 )
+
+const toLower = true // used by recFind/recGetStr below to always return lower case string value
 
 // FindCondition Ops
 const (
@@ -20,34 +26,44 @@ const (
 	EqualTo     // int
 )
 
-// NOTE - The Op code determines if ValStr or ValInt is used for comparison
+// Type FindCondition is used a parameter to recFind func.
+// The Op code determines if ValStr or ValInt is used for comparison.
 type FindCondition struct {
-	Fld    string // fld in Rec containing compare value
+	Fld    string // field name in Rec containing compare value
 	Op     int    // see constants above
 	ValStr string // for Ops Matches, StartsWith, Contains, LessThanStr, GreaterThanStr
 	ValInt int    // for Ops EqualTo, LessThan, GreaterThan
 }
 
-func recGetStr(rec []byte, fld string) string {
-	return fastjson.GetString(rec, fld)
+// NOTE - The compare string value (ValStr) is automatically converted to lower case, so caller doesn't need to convert.
+// If this behaviour is not valid for your use case, code must be changed.
+
+// Func recGetStr returns the string value associated with a field in the record.
+// If optional parm toLower is true, then return lowerCase of value.
+func recGetStr(rec []byte, fld string, toLower ...bool) string {
+	val := fastjson.GetString(rec, fld)
+	if len(toLower) > 0 && toLower[0] {
+		return strings.ToLower(val)
+	}
+	return val
 }
 
+// Func recGetInt returns the int value associated with a field in the record.
 func recGetInt(rec []byte, fld string) int {
 	return fastjson.GetInt(rec, fld)
 }
 
-// recFind determines if rec values meet all find conditions
+// Func recFind determines if rec values meet all find conditions.
 func recFind(rec []byte, conditions []FindCondition) bool {
-	var ok bool
+	var conditionMet bool
 	var n int                        // compare result  1:greater, -1:less, 0:equal
-	var compareVal, recValStr string // only used for strings
+	var compareVal, recValStr string // only used for strings, to support StartsWith and Contains ops
 	for _, condition := range conditions {
-		ok = false
+		conditionMet = false
 		switch condition.Op {
 		case Contains, Matches, StartsWith, LessThanStr, GreaterThanStr: // string comparison
 			compareVal = strings.ToLower(condition.ValStr)
-			recValStr = recGetStr(rec, condition.Fld)
-			recValStr = strings.ToLower(recValStr)
+			recValStr = recGetStr(rec, condition.Fld, toLower)
 			n = cmp.Compare(recValStr, compareVal)
 		case EqualTo, LessThan, GreaterThan: // int comparison
 			recVal := recGetInt(rec, condition.Fld)
@@ -59,105 +75,28 @@ func recFind(rec []byte, conditions []FindCondition) bool {
 		switch condition.Op {
 		case Matches, EqualTo:
 			if n == 0 {
-				ok = true
+				conditionMet = true
 			}
 		case LessThan, LessThanStr:
 			if n == -1 {
-				ok = true
+				conditionMet = true
 			}
 		case GreaterThan, GreaterThanStr:
 			if n == 1 {
-				ok = true
+				conditionMet = true
 			}
 		case StartsWith:
 			if strings.HasPrefix(recValStr, compareVal) {
-				ok = true
+				conditionMet = true
 			}
 		case Contains:
 			if strings.Index(recValStr, compareVal) > -1 {
-				ok = true
+				conditionMet = true
 			}
 		}
-		if !ok {
-			return false // condition was not met
+		if !conditionMet {
+			return false // condition was not met, end recFind
 		}
 	}
 	return true // no condition check returned false
 }
-
-/*
-
-			switch condition.Op {
-			case Matches, LessThanStr, GreaterThanStr:
-				n := cmp.Compare(recVal, compareVal)
-				if condition.Op == Matches && n == 0 {
-					ok = true
-				} else if condition.Op == GreaterThanStr && n == 1 {
-					ok = true
-				} else if condition.Op == LessThanStr && n == -1 {
-					ok = true
-				}
-			case StartsWith:
-				if strings.HasPrefix(recVal, compareVal) {
-					ok = true
-				}
-			case Contains:
-				if strings.Index(recVal, compareVal) > -1 {
-					ok = true
-				}
-			}
-			if !ok {
-				return false // condition was not met
-			}
-
-		}
-		default: // for all int ops
-			recVal := recGetInt(rec, condition.Fld)
-			n := cmp.Compare(recVal, condition.ValInt)
-			switch condition.Op {
-			case EqualTo:
-				if n == 0 {
-					ok = true
-				}
-			case LessThan:
-				if n == -1 {
-					ok = true
-				}
-			case GreaterThan:
-				if n == 1 {
-					ok = true
-				}
-			default:
-				log.Println("invalid find op", condition.Op)
-				return false
-			}
-		}
-		if !ok {
-			return false // condition was not met
-		}
-	}
-	return true
-*/
-
-/*
-	case Contains, Matches, StartsWith: // String Comparison
-			compareVal := strings.ToLower(condition.ValStr)
-			recVal := recGetStr(rec, condition.Fld)
-			recVal = strings.ToLower(recVal)
-			if condition.Op == Matches && recVal == compareVal {
-				ok = true
-			} else if condition.Op == StartsWith && strings.HasPrefix(recVal, compareVal) {
-				ok = true
-			} else if condition.Op == Contains && strings.Index(recVal, compareVal) > -1 {
-				ok = true
-			}
-		case LessThan, GreaterThan, EqualTo:
-			recVal := recGetInt(rec, condition.Fld)
-			if condition.Op == LessThan && recVal < condition.ValInt {
-				ok = true
-			} else if condition.Op == GreaterThan && recVal > condition.ValInt {
-				ok = true
-			} else if condition.Op == EqualTo && recVal == condition.ValInt {
-				ok = true
-			}
-*/

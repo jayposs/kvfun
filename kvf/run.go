@@ -1,6 +1,4 @@
-/*
-Used by all client programs to make requests to a running server program.
-*/
+// Used by all client programs to make requests to a running server program.
 
 package kvf
 
@@ -8,19 +6,23 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"kvfun/core"
 	"log"
 	"net/http"
 )
 
 var BaseURL string = "http://localhost:8000/" // client pgm can override default if needed
+var Debug bool                                // set by client to turn on debugging
 
 // Run func executes the api request using the provided payload.
 func Run(httpClient *http.Client, op string, payload interface{}) (*Response, error) {
 	reqUrl := BaseURL + op
 	jsonContent, err := json.Marshal(&payload) // -> []byte
 
-	//log.Println("--- client sending ---")
-	//log.Println(fmtJSON(jsonContent))
+	if Debug {
+		log.Println("--- client sending ---")
+		log.Println(core.FmtJSON(jsonContent))
+	}
 
 	reqBody := bytes.NewReader(jsonContent) // -> io.Reader
 
@@ -42,8 +44,10 @@ func Run(httpClient *http.Client, op string, payload interface{}) (*Response, er
 		log.Println("Read Http Response.Body Failed:", err)
 	}
 
-	//log.Println("--- client receiving ---")
-	//log.Println(fmtJSON(result))
+	if Debug {
+		log.Println("--- client receiving ---")
+		log.Println(core.FmtJSON(result))
+	}
 
 	kvfResp := new(Response)
 	err = json.Unmarshal(result, kvfResp)

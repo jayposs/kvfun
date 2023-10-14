@@ -1,40 +1,30 @@
-/*
- */
+//	Program loader.go puts test data into "location" bucket. File size is aprox 85,000 records and is used for all testing.
+
 package main
 
 import (
-	"bytes"
 	"encoding/csv"
 	"encoding/json"
-	"io"
+	"kvfun/core"
+	"kvfun/kvf"
 	"log"
 	"net/http"
 	"os"
-
-	"kvfun/kvf"
-	//kvf "github.com/jayposs/kvfun"
+	"sync"
+	"time"
 )
 
-var baseURL string = "http://localhost:8000/"
+var locationData []core.Location
 
 var httpClient *http.Client
 
-var response kvf.Response
-
-type Location struct {
-	Id        string `json:"id"`
-	Address   string `json:"address"`
-	City      string `json:"city"`
-	St        string `json:"st"`
-	Zip       string `json:"zip"`
-	CompanyId int    `json:"companyId"`
-}
-
-var locationData []Location
+var wg sync.WaitGroup
 
 func main() {
 
-	loadData()
+	// kvf.Debug = true
+
+	loadData() // loads data from .csv into locationData slice
 
 	var err error
 	var resp *kvf.Response
@@ -43,99 +33,102 @@ func main() {
 
 	// DELETE / CREATE BUCKET ---------------------------------------
 	bktReq := kvf.BktRequest{BktName: "location", Operation: "delete"}
-	resp, _ = run("bkt", bktReq)
+	resp, _ = kvf.Run(httpClient, "bkt", bktReq)
 
 	bktReq.Operation = "create"
-	resp, err = run("bkt", bktReq)
+	resp, err = kvf.Run(httpClient, "bkt", bktReq)
 	if err != nil {
-		panic("bkt create failed")
+		log.Panicln("bkt create failed", err, resp.Msg)
 	}
 
 	// PUT RECORDS INTO BUCKET -------------------------------------
 	putReq := kvf.PutRequest{
 		BktName:  "location",
 		KeyField: "id",
-		Recs:     make([][]byte, len(locationData)),
 	}
-	for i, rec := range locationData {
-		putReq.Recs[i], _ = json.Marshal(rec) // convert each record to []byte
+	// upload records to db in batches of batchSize records, using goroutines, pause between runs
+	batchSize := 1000
+	var cnt int
+	jsonRecs := make([][]byte, 0, batchSize)
+	for _, rec := range locationData {
+		jsonRec, _ := json.Marshal(rec) // convert each record to []byte
+		jsonRecs = append(jsonRecs, jsonRec)
+		cnt++
+		if cnt == batchSize {
+			cnt = 0
+			putReq.Recs = make([][]byte, batchSize)
+			copy(putReq.Recs, jsonRecs)
+			wg.Add(1)
+			go run(&putReq)
+			jsonRecs = make([][]byte, 0, batchSize)
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	if cnt > 0 {
+		putReq.Recs = make([][]byte, cnt)
+		copy(putReq.Recs, jsonRecs)
+		wg.Add(1)
+		go run(&putReq)
 	}
 
-	resp, err = run("put", putReq)
-	if err != nil {
-		panic("put req failed")
-	}
-	log.Println(resp)
+	wg.Wait() // wait for all runs to finish before ending program
 }
 
 func loadData() {
 	var filePath = "/home/jay/data/properties.csv"
-
 	file, err := os.Open(filePath)
 	if err != nil {
-		panic("open file failed")
+		panic("open csv file failed")
 	}
 	reader := csv.NewReader(file)
-	data, err := reader.ReadAll() // closes file, returns [][]string, error
+	csvRecs, err := reader.ReadAll()
 
-	locationData = make([]Location, 0, len(data))
-	for i := 1; i < len(data); i++ {
-		rec := Location{
-			Id:      data[i][0],
-			Address: data[i][1],
-			City:    data[i][2],
-			St:      data[i][3],
-			Zip:     data[i][4],
+	locationData = make([]core.Location, 0, len(csvRecs))
+
+	var x int // used to provide random values
+	for i, csvRec := range csvRecs {
+		if i == 0 { // skip header
+			continue
 		}
-		if rec.St == "TX" || rec.St == "FL" {
-			rec.CompanyId = 1
-		} else {
-			rec.CompanyId = 2
+		if csvRec[0] == "" {
+			continue
 		}
-		locationData = append(locationData, rec)
+		locRec := core.Location{
+			Id:      csvRec[0],
+			Address: csvRec[1],
+			City:    csvRec[2],
+			St:      csvRec[3],
+			Zip:     csvRec[4],
+			Notes: []string{
+				"Note #1",
+				"Note #2",
+			},
+		}
+		if x < 100 {
+			locRec.LocationType = 1
+			locRec.LastActionDt = "2021-03-22"
+		} else if x < 200 {
+			locRec.LocationType = 2
+			locRec.LastActionDt = "2022-06-10"
+		} else if x < 300 {
+			locRec.LocationType = 3
+			locRec.LastActionDt = "2023-09-01"
+		}
+		x++
+		if x > 400 {
+			x = 0
+		}
+		locationData = append(locationData, locRec)
+
+		// log.Println(locRec)
 	}
 }
 
-// format JSON in easy to view format
-func fmtJSON(jsonContent []byte) string {
-	var out bytes.Buffer
-	json.Indent(&out, jsonContent, "", "  ")
-	return out.String()
-}
-
-// Run method executes the api request using the provided payload.
-func run(op string, payload interface{}) (*kvf.Response, error) {
-	reqUrl := baseURL + op
-	jsonContent, err := json.Marshal(&payload) // -> []byte
-
-	//log.Println("--- client sending ---")
-	//log.Println(fmtJSON(jsonContent))
-
-	reqBody := bytes.NewReader(jsonContent) // -> io.Reader
-
-	req, err := http.NewRequest("POST", reqUrl, reqBody)
-	req.Header.Add("Content-Type", "application/json")
-
-	resp, doErr := httpClient.Do(req)
-	defer func() {
-		if doErr == nil {
-			resp.Body.Close()
-		}
-	}()
-	if resp.StatusCode != http.StatusOK || doErr != nil {
-		log.Println("Request Failed, Status:", resp.StatusCode, " ", resp.Status, " - ", doErr, " --- XXX")
-		return nil, doErr
-	}
-	result, err := io.ReadAll(resp.Body) // -> []byte
+func run(req *kvf.PutRequest) {
+	defer wg.Done()
+	resp, err := kvf.Run(httpClient, "put", req)
 	if err != nil {
-		log.Println("Read Http Response.Body Failed:", err)
+		panic("put req failed")
 	}
-
-	//log.Println("--- client receiving ---")
-	//log.Println(fmtJSON(result))
-
-	kvfResp := new(kvf.Response)
-	err = json.Unmarshal(result, kvfResp)
-
-	return kvfResp, err
+	log.Println(resp)
 }
