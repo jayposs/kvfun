@@ -1,4 +1,6 @@
-//	Program loader.go puts test data into "location" bucket. File size is aprox 85,000 records and is used for all testing.
+// Program loader.go puts test data into "location" bucket.
+// Provides example of bulk data loader.
+// File is aprox 85,000 records and is used for all testing.
 
 package main
 
@@ -10,19 +12,20 @@ import (
 	"log"
 	"net/http"
 	"os"
+
 	"sync"
 	"time"
 )
 
-var locationData []core.Location
+var locationData []core.Location // loaded with data from csv file by loadData func below
 
 var httpClient *http.Client
-
-var wg sync.WaitGroup
 
 func main() {
 
 	// kvf.Debug = true
+
+	var wg sync.WaitGroup
 
 	loadData() // loads data from .csv into locationData slice
 
@@ -42,36 +45,37 @@ func main() {
 	}
 
 	// PUT RECORDS INTO BUCKET -------------------------------------
-	putReq := kvf.PutRequest{
-		BktName:  "location",
-		KeyField: "id",
-	}
-	// upload records to db in batches of batchSize records, using goroutines, pause between runs
+
+	// upload records to db in batches of batchSize records, using goroutines
 	batchSize := 1000
-	var cnt int
-	jsonRecs := make([][]byte, 0, batchSize)
+	putReq := newPutReq(batchSize)
 	for _, rec := range locationData {
-		jsonRec, _ := json.Marshal(rec) // convert each record to []byte
-		jsonRecs = append(jsonRecs, jsonRec)
-		cnt++
-		if cnt == batchSize {
-			cnt = 0
-			putReq.Recs = make([][]byte, batchSize)
-			copy(putReq.Recs, jsonRecs)
+		jsonRec, err := json.Marshal(rec) // convert each record to []byte
+		if err != nil {
+			log.Fatalln("json.Marshal failed", err)
+		}
+		putReq.Recs = append(putReq.Recs, jsonRec)
+		if len(putReq.Recs) == batchSize {
 			wg.Add(1)
-			go run(&putReq)
-			jsonRecs = make([][]byte, 0, batchSize)
-			time.Sleep(10 * time.Millisecond)
+			go run(putReq, &wg)
+			putReq = newPutReq(batchSize)
+			time.Sleep(10 * time.Millisecond) // pause may be appropriate for large number of requests
 		}
 	}
-	if cnt > 0 {
-		putReq.Recs = make([][]byte, cnt)
-		copy(putReq.Recs, jsonRecs)
+	if len(putReq.Recs) > 0 {
 		wg.Add(1)
-		go run(&putReq)
+		go run(putReq, &wg)
 	}
 
-	wg.Wait() // wait for all runs to finish before ending program
+	//wg.Wait() // wait for all runs to finish before ending program
+}
+
+func newPutReq(batchSize int) *kvf.PutRequest {
+	return &kvf.PutRequest{
+		BktName:  "location",
+		KeyField: "id",
+		Recs:     make([][]byte, 0, batchSize),
+	}
 }
 
 func loadData() {
@@ -113,22 +117,21 @@ func loadData() {
 		} else if x < 300 {
 			locRec.LocationType = 3
 			locRec.LastActionDt = "2023-09-01"
-		}
-		x++
-		if x > 400 {
+		} else {
 			x = 0
 		}
+		x++
 		locationData = append(locationData, locRec)
-
-		// log.Println(locRec)
 	}
 }
 
-func run(req *kvf.PutRequest) {
+func run(req *kvf.PutRequest, wg *sync.WaitGroup) {
 	defer wg.Done()
 	resp, err := kvf.Run(httpClient, "put", req)
 	if err != nil {
 		panic("put req failed")
 	}
-	log.Println(resp)
+	if resp.Status != kvf.Ok {
+		log.Println("ERROR", kvf.StatusTxt[resp.Status], resp.Msg)
+	}
 }

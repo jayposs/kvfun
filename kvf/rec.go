@@ -12,8 +12,6 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-const toLower = true // used by recFind/recGetStr below to always return lower case string value
-
 // FindCondition Ops
 const (
 	Contains int = iota
@@ -39,13 +37,10 @@ type FindCondition struct {
 // If this behaviour is not valid for your use case, code must be changed.
 
 // Func recGetStr returns the string value associated with a field in the record.
-// If optional parm toLower is true, then return lowerCase of value.
-func recGetStr(rec []byte, fld string, toLower ...bool) string {
+// The value is lower cased.
+func recGetStr(rec []byte, fld string) string {
 	val := fastjson.GetString(rec, fld)
-	if len(toLower) > 0 && toLower[0] {
-		return strings.ToLower(val)
-	}
-	return val
+	return strings.ToLower(val)
 }
 
 // Func recGetInt returns the int value associated with a field in the record.
@@ -63,7 +58,7 @@ func recFind(rec []byte, conditions []FindCondition) bool {
 		switch condition.Op {
 		case Contains, Matches, StartsWith, LessThanStr, GreaterThanStr: // string comparison
 			compareVal = strings.ToLower(condition.ValStr)
-			recValStr = recGetStr(rec, condition.Fld, toLower)
+			recValStr = recGetStr(rec, condition.Fld)
 			n = cmp.Compare(recValStr, compareVal)
 		case EqualTo, LessThan, GreaterThan: // int comparison
 			recVal := recGetInt(rec, condition.Fld)

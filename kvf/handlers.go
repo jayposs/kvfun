@@ -1,5 +1,9 @@
 // File handlers.go contains a func to process each request type.
 // These funcs are called by the dbHandler func in the server.go program.
+// NOTE on Get and Qry funcs:
+//		Response record values are copies of the value returned by Get or Cursor.Next.
+//		Assumption is appending a []byte to the Response slice, contains ref to underlying src array.
+//		Not sure if this assumption is correct, but better safe than sorry.
 
 package kvf
 
@@ -12,6 +16,19 @@ import (
 )
 
 var DefaultQryRespSize = 300 // response slice initial allocation for this size
+
+// Response Status Values
+const (
+	Ok int = iota
+	Fail
+	Warning
+)
+
+var StatusTxt = map[int]string{
+	0: "Ok",
+	1: "Fail",
+	2: "Warning",
+}
 
 // constants used by Qry func sort logic
 const (
@@ -29,17 +46,19 @@ type SortKey struct {
 
 // Response used for all requests
 type Response struct {
-	Status    string   `json:"status"` // ok or fail
-	Msg       string   `json:"msg"`
-	TimeStamp string   `json:"timeStamp"`
-	Recs      [][]byte `json:"recs"` // for request responses with potentially more than 1 record
-	Rec       []byte   `json:"rec"`  // for requests that only return 1 record
+	Status int      `json:"status"` // see constants above Ok, Warning, Fail
+	Msg    string   `json:"msg"`
+	Recs   [][]byte `json:"recs"`   // for request responses with potentially more than 1 record
+	Rec    []byte   `json:"rec"`    // for requests that only return 1 record
+	PutCnt int      `json:"putCnt"` // number of records either added or replaced by Put operation
 }
 
 // Get returns recs with keys matching requested keys.
 func Get(tx *bolt.Tx, req *GetRequest) *Response {
 
 	resp := new(Response)
+	resp.Status = Ok // may be changed to Warning below if key not found
+
 	bkt := openBkt(tx, resp, req.BktName)
 	if bkt == nil {
 		return resp
@@ -50,14 +69,14 @@ func Get(tx *bolt.Tx, req *GetRequest) *Response {
 		v := bkt.Get([]byte(key))
 		if v == nil {
 			log.Println("key not found", key)
+			resp.Status = Warning
 			resp.Msg = "Requested Record(s) Not Found"
 			continue // NOTE - THIS BEHAVIOUR MAY NOT BE APPROPRIATE FOR ALL SITUATIONS
 		}
-		vcopy := make([]byte, len(v)) // ref to v are invalid outside tx, so copy
+		vcopy := make([]byte, len(v)) // ref to v are invalid outside tx, so copy (see note at top)
 		copy(vcopy, v)
 		resp.Recs = append(resp.Recs, vcopy)
 	}
-	resp.Status = "ok"
 	return resp
 }
 
@@ -72,14 +91,14 @@ func GetOne(tx *bolt.Tx, req *GetOneRequest) *Response {
 	v := bkt.Get([]byte(req.Key))
 	if v == nil {
 		log.Println("key not found", req.Key)
-		resp.Status = "fail"
+		resp.Status = Warning
 		resp.Msg = "Requested Record Not Found - " + req.Key
 		return resp
 	}
-	resp.Rec = make([]byte, len(v)) // ref to v are invalid outside tx, so copy
+	resp.Rec = make([]byte, len(v)) // ref to v are invalid outside tx, so copy (see note at top)
 	copy(resp.Rec, v)
 
-	resp.Status = "ok"
+	resp.Status = Ok
 	return resp
 }
 
@@ -104,8 +123,6 @@ func GetAll(tx *bolt.Tx, req *GetAllRequest) *Response {
 	} else {
 		k, v = csr.Seek([]byte(req.StartKey))
 	}
-
-	log.Println("GetAll read loop start")
 	for k != nil {
 		key := string(k)
 		if req.EndKey != "" && key > req.EndKey {
@@ -114,17 +131,13 @@ func GetAll(tx *bolt.Tx, req *GetAllRequest) *Response {
 		result = append(result, v)
 		k, v = csr.Next()
 	}
-	log.Println("GetAll read loop done")
-
 	resp.Recs = make([][]byte, 0, len(result))
 	for _, v := range result {
 		vcopy := make([]byte, len(v))
-		copy(vcopy, v) // ref to v are invalid outside tx, so copy
+		copy(vcopy, v) // ref to v are invalid outside tx, so copy (see note at top)
 		resp.Recs = append(resp.Recs, vcopy)
 	}
-	log.Println("GetAll copy vals done")
-
-	resp.Status = "ok"
+	resp.Status = Ok
 	return resp
 }
 
@@ -142,19 +155,20 @@ func Put(tx *bolt.Tx, req *PutRequest) *Response {
 		if key == "" {
 			log.Println("key value not found in record for specified KeyField - ", req.KeyField)
 			log.Println(string(rec))
-			resp.Status = "fail"
+			resp.Status = Fail
 			resp.Msg = "key value not found in record for specified KeyField - " + req.KeyField
-			continue
+			return resp
 		}
 		err := bkt.Put([]byte(key), rec)
 		if err != nil {
 			log.Println("put failed", err)
-			resp.Status = "fail"
+			resp.Status = Fail
 			resp.Msg = "Put Request Failed - " + err.Error()
 			return resp
 		}
+		resp.PutCnt++
 	}
-	resp.Status = "ok"
+	resp.Status = Ok
 	return resp
 }
 
@@ -169,18 +183,19 @@ func PutOne(tx *bolt.Tx, req *PutOneRequest) *Response {
 	key := recGetStr(req.Rec, req.KeyField)
 	if key == "" {
 		log.Println("key value not found in record", req.KeyField)
-		resp.Status = "fail"
+		resp.Status = Fail
 		resp.Msg = "key value not found in record - " + req.KeyField
 		return resp
 	}
 	err := bkt.Put([]byte(key), req.Rec)
 	if err != nil {
 		log.Println("put failed", err)
-		resp.Status = "fail"
+		resp.Status = Fail
 		resp.Msg = "Put Request Failed - " + err.Error()
 		return resp
 	}
-	resp.Status = "ok"
+	resp.PutCnt = 1
+	resp.Status = Ok
 	return resp
 }
 
@@ -196,12 +211,12 @@ func Delete(tx *bolt.Tx, req *DeleteRequest) *Response {
 		err := bkt.Delete([]byte(key))
 		if err != nil { // key not found does not return error
 			log.Println("delete error - ", key, err)
-			resp.Status = "fail"
+			resp.Status = Fail
 			resp.Msg = "delete error - " + key
 			return resp
 		}
 	}
-	resp.Status = "ok"
+	resp.Status = Ok
 	return resp
 }
 
@@ -216,7 +231,7 @@ func Qry(tx *bolt.Tx, req *QryRequest) *Response {
 	}
 	csr := bkt.Cursor()
 
-	result := make(map[string][]byte, DefaultQryRespSize)
+	result := make(map[string][]byte, DefaultQryRespSize) // recs meeting criteria, map key is db Key, map value is db Value
 
 	var k, v []byte
 	if req.StartKey == "" {
@@ -249,7 +264,7 @@ func Qry(tx *bolt.Tx, req *QryRequest) *Response {
 
 	if req.SortFlds != nil {
 		log.Println("sort start")
-		slices.SortFunc(keys, func(a, b string) int {
+		slices.SortFunc(keys, func(a, b string) int { // slices pkg added in Go 1.21
 			reca := result[a]
 			recb := result[b]
 			var n int
@@ -282,10 +297,10 @@ func Qry(tx *bolt.Tx, req *QryRequest) *Response {
 	for _, key := range keys {
 		v := result[key]
 		vcopy := make([]byte, len(v))
-		copy(vcopy, v) // refs to returned vals are invalid outside tx, so response is loaded with copies
+		copy(vcopy, v) // ref to v are invalid outside tx, so copy (see note at top)
 		resp.Recs = append(resp.Recs, vcopy)
 	}
-	resp.Status = "ok"
+	resp.Status = Ok
 	return resp
 }
 
@@ -302,11 +317,11 @@ func Bkt(tx *bolt.Tx, req *BktRequest) *Response {
 	}
 	if err != nil {
 		log.Println("Bkt Operation Failed-" + req.Operation + "-" + req.BktName)
-		resp.Status = "fail"
+		resp.Status = Fail
 		resp.Msg = "Bkt Operation Failed-" + req.Operation + "-" + req.BktName
 		return resp
 	}
-	resp.Status = "ok"
+	resp.Status = Ok
 	return resp
 }
 
@@ -314,7 +329,7 @@ func openBkt(tx *bolt.Tx, resp *Response, bktName string) *bolt.Bucket {
 	bkt := tx.Bucket([]byte(bktName))
 	if bkt == nil {
 		log.Println("Bkt Not Found - ", bktName)
-		resp.Status = "fail"
+		resp.Status = Fail
 		resp.Msg = "Bkt Not Found - " + bktName
 	}
 	return bkt

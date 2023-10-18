@@ -1,6 +1,11 @@
-# Notes 
+## Notes 
+See client1/client1.go for examples of using most features.  
+See loader/loader.go for example of bulk data loader.  
+See server/server.go for db server program (~130 lines).  
 
-Sorting Options Used in Qry Request   
+References to "rec/record" mean the Value ( []byte ) used for Gets and Puts.  
+
+**Sorting Options Used in Qry Request**   
 Code located in kvf/handlers.go 
 ```
 // constants used by sort code in Qry func
@@ -12,11 +17,11 @@ const (
 )
 
 type SortKey struct {
-	Fld string `json:"fld"` // name of field
+	Fld string `json:"fld"` // name (json) of field in record containing sort value
 	Dir int    `json:"dir"` // direction (Asc/Desc) and field type (Str/Int)
 }
 ```  
-Find Options Used in Qry Request   
+**Find Ops/Conditions Used in Qry Request**   
 Code located in kvf/rec.go   
 ```
 // FindCondition Ops
@@ -33,7 +38,7 @@ const (
 
 // NOTE - The Op code determines if ValStr or ValInt is used for comparison
 type FindCondition struct {
-	Fld    string // json field name in Rec containing compare value
+	Fld    string // name (json) of field in record containing compare value
 	Op     int    // see constants above
 	ValStr string // for Ops: Matches, StartsWith, Contains, LessThanStr, GreaterThanStr
 	ValInt int    // for Ops: EqualTo, LessThan, GreaterThan
@@ -46,7 +51,11 @@ type FindCondition struct {
 * Add Http Request handler logic to server/server.go
 
 **Performance**  
-Reading records is very fast. For large result sets, most of the time will be spent json.Marshalling the Response. Putting (add/replace) is pretty slow for large updates. Breaking large updates into smaller batches speeds things a lot. See loader/loader.go for example using goroutines to send multiple updates simultaneously. This method was much faster than sending a single large update. My test system (Intel® Core™ i3-8109U CPU @ 3.00GHz × 4 released 2018) took aprox 8 secs to load 85,000 records in single batch and less than 2 seconds to load same records in batches of 1000 using goroutines. Reading the same 85,000 records from a single bucket takes aprox 10ms.
+Reading records is very fast. For large result sets, most of the time will be spent json.Marshalling the Response. Putting (add/replace) is pretty slow for large updates. Breaking large updates into smaller batches speeds things a lot. See loader/loader.go for example using goroutines to send multiple updates simultaneously. This method was much faster than sending a single large update. My test system (Intel® Core™ i3-8109U CPU @ 3.00GHz × 4 released 2018) took aprox 8 secs to load 85,000 records in single batch and less than 2 seconds to load same records in batches of 1000 using goroutines. Reading the same 85,000 records from a single bucket takes aprox 10ms.  
+
+Note - I suspect the reason using goroutines speeds up the loader pgm is because the json.UnMarshal of the Put Request can run simultaneously with other requests. Only 1 Bolt Update transaction can run at a time.
+
+Optimization is possible using [fastjson.Parser](https://pkg.go.dev/github.com/valyala/fastjson#Parser) when using multiple Qry FindConditions and SortKeys. Currently each field value is retrieved using fastjson.GetString or fastjson.GetInt. This change may require significant rewrite of code in kvf/rec.go.
 
 ## General Comments  
 

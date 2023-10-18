@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"kvfun/core"
 	"log"
 	"net/http"
 )
@@ -21,7 +20,7 @@ func Run(httpClient *http.Client, op string, payload interface{}) (*Response, er
 
 	if Debug {
 		log.Println("--- client sending ---")
-		log.Println(core.FmtJSON(jsonContent))
+		log.Println(fmtJSON(jsonContent))
 	}
 
 	reqBody := bytes.NewReader(jsonContent) // -> io.Reader
@@ -46,11 +45,18 @@ func Run(httpClient *http.Client, op string, payload interface{}) (*Response, er
 
 	if Debug {
 		log.Println("--- client receiving ---")
-		log.Println(core.FmtJSON(result))
+		log.Println(fmtJSON(result))
 	}
 
 	kvfResp := new(Response)
 	err = json.Unmarshal(result, kvfResp)
 
 	return kvfResp, err
+}
+
+// format JSON in easy to view format
+func fmtJSON(jsonContent []byte) string {
+	var out bytes.Buffer
+	json.Indent(&out, jsonContent, "", "  ")
+	return out.String()
 }
