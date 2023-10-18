@@ -1,6 +1,44 @@
-// File reqtypes.go contains all the request types used by client programs and processed by a server program.
+// File kvftypes.go contains constants, Response type and Request types used by client programs and processed by a server program.
 
 package kvf
+
+// Response Status Values
+const (
+	Ok int = iota
+	Fail
+	Warning
+)
+
+var StatusTxt = map[int]string{
+	0: "Ok",
+	1: "Fail",
+	2: "Warning",
+}
+
+// Response used for all requests
+type Response struct {
+	Status int      `json:"status"` // see constants above Ok, Warning, Fail
+	Msg    string   `json:"msg"`
+	Recs   [][]byte `json:"recs"`   // for request responses with potentially more than 1 record
+	Rec    []byte   `json:"rec"`    // for requests that only return 1 record
+	PutCnt int      `json:"putCnt"` // number of records either added or replaced by Put operation
+}
+
+// Constants used in QryRequest.SortFlds and by handlers.Qry() sort logic
+const (
+	AscStr int = iota
+	DescStr
+	AscInt
+	DescInt
+)
+
+// SortKey used in QryRequest.SortFlds and by handlers.Qry() sort logic
+type SortKey struct {
+	Fld string `json:"fld"` // name of field
+	Dir int    `json:"dir"` // direction (asc/desc) and field type (Str/Int)
+}
+
+// -----  REMAINDER OF FILE IS REQUEST TYPES CREATED BY CLIENTS AND PROCESSED BY SERVER ------
 
 // BktRequest is used to create or delete bkt.
 type BktRequest struct {
