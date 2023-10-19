@@ -67,7 +67,7 @@ func main() {
 		go run(putReq, &wg)
 	}
 
-	//wg.Wait() // wait for all runs to finish before ending program
+	wg.Wait() // wait for all runs to finish before ending program
 }
 
 func newPutReq(batchSize int) *kvf.PutRequest {

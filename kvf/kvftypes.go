@@ -2,6 +2,8 @@
 
 package kvf
 
+const StrToLower = true // optional parm used when calling rec.go/recGetStr
+
 // Response Status Values
 const (
 	Ok int = iota
@@ -24,7 +26,7 @@ type Response struct {
 	PutCnt int      `json:"putCnt"` // number of records either added or replaced by Put operation
 }
 
-// Constants used in QryRequest.SortFlds and by handlers.Qry() sort logic
+// Constants used in QryRequest.SortFlds and by handlers.go Qry() sort logic
 const (
 	AscStr int = iota
 	DescStr
@@ -32,10 +34,31 @@ const (
 	DescInt
 )
 
-// SortKey used in QryRequest.SortFlds and by handlers.Qry() sort logic
+// SortKey used in QryRequest.SortFlds and by handlers.go Qry() sort logic
 type SortKey struct {
 	Fld string `json:"fld"` // name of field
 	Dir int    `json:"dir"` // direction (asc/desc) and field type (Str/Int)
+}
+
+// FindCondition Ops
+const (
+	Contains int = iota
+	Matches
+	StartsWith
+	LessThanStr
+	GreaterThanStr
+	LessThan    // int
+	GreaterThan // int
+	EqualTo     // int
+)
+
+// FindCondition used in QryRequest.FindConditions and by rec.go recFind()
+// The Op code determines if ValStr or ValInt is used for comparison.
+type FindCondition struct {
+	Fld    string // field name in Rec containing compare value
+	Op     int    // see constants above
+	ValStr string // for Ops Matches, StartsWith, Contains, LessThanStr, GreaterThanStr
+	ValInt int    // for Ops EqualTo, LessThan, GreaterThan
 }
 
 // -----  REMAINDER OF FILE IS REQUEST TYPES CREATED BY CLIENTS AND PROCESSED BY SERVER ------

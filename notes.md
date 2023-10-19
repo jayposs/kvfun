@@ -44,6 +44,33 @@ type FindCondition struct {
 	ValInt int    // for Ops: EqualTo, LessThan, GreaterThan
 }
 ```  
+Response Status Values and struct type returned for all requests is located in kvf/handlers.go.  
+```
+// Response Status Values
+const (
+	Ok int = iota
+	Fail
+	Warning
+)
+
+// Response used for all requests
+type Response struct {
+	Status int      `json:"status"` // see constants above Ok, Warning, Fail
+	Msg    string   `json:"msg"`
+	Recs   [][]byte `json:"recs"`   // for request responses with potentially more than 1 record
+	Rec    []byte   `json:"rec"`    // for requests that only return 1 record
+	PutCnt int      `json:"putCnt"` // number of records either added or replaced by Put operation
+}
+```  
+**Request Types (kvf/reqtypes.go) can be created just like any struct type.**  
+**Or Shorthand funcs in core/util.go can be used, see client1.go for examples:**  
+* Get() uses parameters to build/run kvf.GetOne and kvf.Get requests
+* Put() uses parameters to build/run kvf.Put request
+* PutOne() uses parameters to build/run kvf.PutOne request  
+* Qry() uses parameters to build/run kvf.Qry request
+* FindInt() returns []kvf.FindCondition with 1 string condition loaded
+* FindStr() returns []kvf.FindCondition with 1 int condition loaded
+* SortBy() returns []kvf.SortKey with 1 SortKey loaded
 
 ## Steps To Add Feature  
 * Add Request Type to kvf/reqtypes.go

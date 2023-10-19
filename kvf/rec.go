@@ -12,35 +12,16 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-// FindCondition Ops
-const (
-	Contains int = iota
-	Matches
-	StartsWith
-	LessThanStr
-	GreaterThanStr
-	LessThan    // int
-	GreaterThan // int
-	EqualTo     // int
-)
-
-// Type FindCondition is used a parameter to recFind func.
-// The Op code determines if ValStr or ValInt is used for comparison.
-type FindCondition struct {
-	Fld    string // field name in Rec containing compare value
-	Op     int    // see constants above
-	ValStr string // for Ops Matches, StartsWith, Contains, LessThanStr, GreaterThanStr
-	ValInt int    // for Ops EqualTo, LessThan, GreaterThan
-}
-
 // NOTE - The compare string value (ValStr) is automatically converted to lower case, so caller doesn't need to convert.
 // If this behaviour is not valid for your use case, code must be changed.
 
 // Func recGetStr returns the string value associated with a field in the record.
-// The value is lower cased.
-func recGetStr(rec []byte, fld string) string {
+func recGetStr(rec []byte, fld string, toLower ...bool) string {
 	val := fastjson.GetString(rec, fld)
-	return strings.ToLower(val)
+	if len(toLower) > 0 && toLower[0] {
+		val = strings.ToLower(val)
+	}
+	return val
 }
 
 // Func recGetInt returns the int value associated with a field in the record.
@@ -58,7 +39,7 @@ func recFind(rec []byte, conditions []FindCondition) bool {
 		switch condition.Op {
 		case Contains, Matches, StartsWith, LessThanStr, GreaterThanStr: // string comparison
 			compareVal = strings.ToLower(condition.ValStr)
-			recValStr = recGetStr(rec, condition.Fld)
+			recValStr = recGetStr(rec, condition.Fld, StrToLower)
 			n = cmp.Compare(recValStr, compareVal)
 		case EqualTo, LessThan, GreaterThan: // int comparison
 			recVal := recGetInt(rec, condition.Fld)

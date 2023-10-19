@@ -1,9 +1,9 @@
 // File handlers.go contains a func to process each request type.
 // These funcs are called by the dbHandler func in the server.go program.
-// NOTE on Get and Qry funcs:
-//		Response record values are copies of the value returned by Get or Cursor.Next.
-//		Assumption is appending a []byte to the Response slice, contains ref to underlying src array.
-//		Not sure if this assumption is correct, but better safe than sorry.
+// Note - Response.Recs contains copies of vals returned from db.
+//   Once Transaction(tx) has ended, refs to db vals may become invalid.
+//   The json.Marshal of Response occurs outside the tx.
+//   Not sure if this step is necessary, but better safe than sorry.
 
 package kvf
 
@@ -16,42 +16,6 @@ import (
 )
 
 var DefaultQryRespSize = 300 // response slice initial allocation for this size
-
-// Response Status Values
-const (
-	Ok int = iota
-	Fail
-	Warning
-)
-
-var StatusTxt = map[int]string{
-	0: "Ok",
-	1: "Fail",
-	2: "Warning",
-}
-
-// constants used by Qry func sort logic
-const (
-	AscStr int = iota
-	DescStr
-	AscInt
-	DescInt
-)
-
-// SortKey used by Qry func sort logic
-type SortKey struct {
-	Fld string `json:"fld"` // name of field
-	Dir int    `json:"dir"` // direction (asc/desc) and field type (Str/Int)
-}
-
-// Response used for all requests
-type Response struct {
-	Status int      `json:"status"` // see constants above Ok, Warning, Fail
-	Msg    string   `json:"msg"`
-	Recs   [][]byte `json:"recs"`   // for request responses with potentially more than 1 record
-	Rec    []byte   `json:"rec"`    // for requests that only return 1 record
-	PutCnt int      `json:"putCnt"` // number of records either added or replaced by Put operation
-}
 
 // Get returns recs with keys matching requested keys.
 func Get(tx *bolt.Tx, req *GetRequest) *Response {
@@ -243,7 +207,7 @@ func Qry(tx *bolt.Tx, req *QryRequest) *Response {
 	keys := make([]string, 0, DefaultQryRespSize)
 	var keep bool
 
-	log.Println("qry read loop start")
+	log.Println("qry find loop start")
 	for k != nil {
 		key := string(k)
 		if req.EndKey != "" && key > req.EndKey {
@@ -260,10 +224,10 @@ func Qry(tx *bolt.Tx, req *QryRequest) *Response {
 		}
 		k, v = csr.Next()
 	}
-	log.Println("qry read loop done")
+	log.Println("qry find loop done")
 
 	if req.SortFlds != nil {
-		log.Println("sort start")
+		log.Println("qry sort start")
 		slices.SortFunc(keys, func(a, b string) int { // slices pkg added in Go 1.21
 			reca := result[a]
 			recb := result[b]
@@ -271,8 +235,8 @@ func Qry(tx *bolt.Tx, req *QryRequest) *Response {
 			for _, sortkey := range req.SortFlds {
 				switch sortkey.Dir {
 				case AscStr, DescStr: // compare string flds
-					vala := recGetStr(reca, sortkey.Fld)
-					valb := recGetStr(recb, sortkey.Fld)
+					vala := recGetStr(reca, sortkey.Fld, StrToLower)
+					valb := recGetStr(recb, sortkey.Fld, StrToLower)
 					n = cmp.Compare(vala, valb)
 				case AscInt, DescInt: // compare int flds
 					vala := recGetInt(reca, sortkey.Fld)
@@ -289,7 +253,7 @@ func Qry(tx *bolt.Tx, req *QryRequest) *Response {
 			}
 			return 0 // all sort key values are equal
 		})
-		log.Println("sort done")
+		log.Println("qry sort done")
 	}
 
 	// load response.Recs slice in order based on sorted order of keys
