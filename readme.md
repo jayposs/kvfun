@@ -1,4 +1,4 @@
-## KVFUN - FUNdamentally Better Way to Use Key-Value Databases 
+## KVFun - *Fun*damentally Better Way to Use Key-Value Databases 
 
 Developed with A.I. (American Ingenuity)  **You'll be thinking WTF (Wow That's Fast)**  
 
