@@ -64,6 +64,7 @@ func main() {
 		if err := db.Close(); err != nil {
 			log.Fatal(err)
 		}
+		log.Println("db closed")
 	})
 
 	log.Println(http.ListenAndServe(":8000", nil))
