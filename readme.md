@@ -15,12 +15,12 @@ See [notes.md](notes.md) for more detailed information.
 
 **Other Options** with similar goals are [BoltHold](https://github.com/timshannon/bolthold) and [Storm](https://github.com/asdine/storm) (both have way more features and way more code). 
 
-*Project Targets - Small, Simple, Useful*  
+*Project Targets* - Small, Simple, Useful  
 
 *Code Flow* - 
 Client pgm sends http request to running server pgm. Server pgm calls func in handlers.go which processes request. 
 
-*Review these 3 code files to see if/how targets were achieved*    
+*Review these 3 code files to see if/how targets were achieved:*    
 * server/server.go - uses http.ListenAndServe to process client requests by calling funcs in handlers.go
 * kvf/handlers.go - 1 func for each request type (get, get1, put, put1, qry, ...)
 * kvf/rec.go - handler support funcs

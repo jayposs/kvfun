@@ -153,7 +153,11 @@ func getAll() {
 
 func getAllSequence() {
 	log.Println("-- get all sequence, should return 4 records --")
-	req := kvf.GetAllRequest{BktName: bktLocation, StartKey: "59404eebc58bd1a4ee1252ec", EndKey: "59404eebc58bd1a4ee1252ef"}
+	req := kvf.GetAllRequest{
+		BktName:  bktLocation,
+		StartKey: "59404eebc58bd1a4ee1252ec",
+		EndKey:   "59404eebc58bd1a4ee1252ef",
+	}
 	resp, err := kvf.Run(httpClient, "getall", req)
 	checkResp(resp, err)
 

@@ -1,14 +1,14 @@
 ## Notes 
-See client1/client1.go for examples of using most features.  
+See client1/client1.go for examples of how to use most features.  
 See loader/loader.go for example of bulk data loader.  
-See server/server.go for db server program (~130 lines).  
+See server/server.go for db server program.  
 
 References to "rec/record" mean the Value ( []byte ) used for Gets and Puts.  
 
 ### Request Types (see struct types in kvftypes.go and process funcs in handlers.go)  
 * Get - returns multiple recs using specific keys
 * GetOne - returns single rec using specific key
-* GetAll - returns all recs or all recs inside start/end key sequence from bucket
+* GetAll - returns all recs or all recs inside start/end key sequence from bucket in key order
 * Put - adds/replaces multiple recs
 * PutOne - add/replaces single rec
 * Qry - returns recs meeting find conditions in sorted order, can specify start/end key range
@@ -115,4 +115,6 @@ There are a number of "good to have" features that could be added, but would mak
 * Relational feature (I have designed a workable scheme)
 * Nesting buckets (supported directly by Bolt)
 * Replace "Put" with "Add", "Update", "Replace" functionality
-* Depending on workload, using GOB encoding rather than JSON may be better
+* Depending on workload, using GOB encoding rather than JSON may be better  
+
+If you like what is contained here, take it and run. Don't count on any future changes by me, but there could be. See [blahblahblah.md](blahblahblah.md) for additional info.

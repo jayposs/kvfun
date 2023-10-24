@@ -185,7 +185,7 @@ func Delete(tx *bolt.Tx, req *DeleteRequest) *Response {
 }
 
 // Qry returns records that meet request FindConditions and in specified sort order.
-// See type SortKey and Op constants above.
+// See type SortKey and Op constants in kvftypes.go
 func Qry(tx *bolt.Tx, req *QryRequest) *Response {
 
 	resp := new(Response)

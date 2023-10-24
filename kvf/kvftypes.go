@@ -2,8 +2,6 @@
 
 package kvf
 
-const StrToLower = true // optional parm used when calling rec.go/recGetStr
-
 // Response Status Values
 const (
 	Ok int = iota

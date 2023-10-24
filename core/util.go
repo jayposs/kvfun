@@ -10,7 +10,7 @@ import (
 	"net/http"
 )
 
-var KeyFieldName = "id"
+var KeyFieldName = "id" // json name of field name in record, containing key value for Put/PutOne requests
 
 // FmtJSON formats json into easy to view format
 func FmtJSON(jsonContent []byte) string {
@@ -42,11 +42,12 @@ func Get(httpClient *http.Client, bktName string, keys ...string) (*kvf.Response
 }
 
 // Put provides shorthand way of calling kvf.Run with Put request.
+// KeyFieldName is loaded from var KeyFieldName above. This field must be defined in each record.
 // Unlike PutOne, recs in input recs parm must already be json.Marshaled, due to problems working with []any.
 func Put(httpClient *http.Client, bktName string, recs [][]byte) (*kvf.Response, error) {
 	req := kvf.PutRequest{
 		BktName:  bktName,
-		KeyField: KeyFieldName,
+		KeyField: KeyFieldName, // var KeyFieldName is defined above
 		Recs:     recs,
 	}
 	resp, err := kvf.Run(httpClient, "put", &req)
@@ -57,6 +58,7 @@ func Put(httpClient *http.Client, bktName string, recs [][]byte) (*kvf.Response,
 }
 
 // PutOne provides shorthand way of calling kvf.Run with PutOne request.
+// KeyFieldName is loaded from var KeyFieldName above. This field must be defined in each record.
 // Unlike Put func, input rec is struct type value and will be json.Marshalled.
 func PutOne(httpClient *http.Client, bktName string, rec any) (*kvf.Response, error) {
 	jsonRec, err := json.Marshal(rec)
@@ -66,7 +68,7 @@ func PutOne(httpClient *http.Client, bktName string, rec any) (*kvf.Response, er
 	}
 	req := kvf.PutOneRequest{
 		BktName:  bktName,
-		KeyField: KeyFieldName,
+		KeyField: KeyFieldName, // var KeyFieldName is defined above
 		Rec:      jsonRec,
 	}
 	resp, err := kvf.Run(httpClient, "putone", &req)

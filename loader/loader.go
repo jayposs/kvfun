@@ -41,7 +41,7 @@ func main() {
 	bktReq.Operation = "create"
 	resp, err = kvf.Run(httpClient, "bkt", bktReq)
 	if err != nil {
-		log.Panicln("bkt create failed", err, resp.Msg)
+		log.Fatalln("bkt create failed", err, resp.Msg)
 	}
 
 	// PUT RECORDS INTO BUCKET -------------------------------------
@@ -82,7 +82,7 @@ func loadData() {
 	var filePath = "/home/jay/data/properties.csv"
 	file, err := os.Open(filePath)
 	if err != nil {
-		panic("open csv file failed")
+		log.Fatalln("open csv file failed", err)
 	}
 	reader := csv.NewReader(file)
 	csvRecs, err := reader.ReadAll()
@@ -129,9 +129,9 @@ func run(req *kvf.PutRequest, wg *sync.WaitGroup) {
 	defer wg.Done()
 	resp, err := kvf.Run(httpClient, "put", req)
 	if err != nil {
-		panic("put req failed")
+		log.Fatalln("put req failed", err)
 	}
 	if resp.Status != kvf.Ok {
-		log.Println("ERROR", kvf.StatusTxt[resp.Status], resp.Msg)
+		log.Fatalln("ERROR", kvf.StatusTxt[resp.Status], resp.Msg)
 	}
 }

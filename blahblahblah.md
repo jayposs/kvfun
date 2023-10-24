@@ -14,5 +14,5 @@ When setting up a system, there are a million things to consider. I just wanted 
 
 If you decide to explore kvfun, consider it your own code with which to modify as needed. I really tried to keep the code small and easy to understand. See notes.md for more information on how to add new features. I don't consider kvfun a full featured package, but rather a good starting point.  
 
-I'm 66 years old (as of 2023) so my future plans are rather uncertain. Have Fun.  
+I'm 66 years old (as of 2023) so my future plans are rather uncertain. I had fun writing this code. Hope it adds some fun to your projects.  
 Jay

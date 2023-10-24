@@ -71,10 +71,14 @@ func main() {
 
 func dbHandler(op string, request any, w http.ResponseWriter, r *http.Request) {
 	log.Println("request started")
-	jsonContent, _ := io.ReadAll(r.Body) // -> []byte
-	err := json.Unmarshal(jsonContent, request)
+	jsonContent, err := io.ReadAll(r.Body) // -> []byte
 	if err != nil {
-		log.Println(op, err)
+		log.Println("readall of request body failed", op, err)
+		return
+	}
+	err = json.Unmarshal(jsonContent, request)
+	if err != nil {
+		log.Println("json.Unmarshal failed", op, err)
 		log.Println(string(jsonContent))
 		return
 	}
@@ -121,7 +125,12 @@ func dbHandler(op string, request any, w http.ResponseWriter, r *http.Request) {
 			return nil
 		})
 	}
-	jsonData, _ := json.Marshal(response) // if sending response to remote requester, then compression is probably a good idea
+	jsonData, err := json.Marshal(response) // if sending response to remote requester, then compression is probably a good idea
+	if err != nil {
+		log.Println("json.Marshal response failed", err)
+		log.Println(response)
+		return
+	}
 	w.Write(jsonData)
 	log.Println("request done")
 }

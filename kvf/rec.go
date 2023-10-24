@@ -12,8 +12,7 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-// NOTE - The compare string value (ValStr) is automatically converted to lower case, so caller doesn't need to convert.
-// If this behaviour is not valid for your use case, code must be changed.
+const StrToLower = true // optional parm used when calling recGetStr()
 
 // Func recGetStr returns the string value associated with a field in the record.
 func recGetStr(rec []byte, fld string, toLower ...bool) string {
@@ -29,7 +28,10 @@ func recGetInt(rec []byte, fld string) int {
 	return fastjson.GetInt(rec, fld)
 }
 
-// Func recFind determines if rec values meet all find conditions.
+// NOTE - in recFind() string values are converted to lower case.
+// If this behaviour is not valid for your use case, code must be changed.
+
+// Func recFind determines if rec value(s) meet all find conditions.
 func recFind(rec []byte, conditions []FindCondition) bool {
 	var conditionMet bool
 	var n int                        // compare result  1:greater, -1:less, 0:equal
