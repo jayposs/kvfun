@@ -78,7 +78,7 @@ func main() {
 
 	qry3() // qry using using various options
 
-	kvf.Run(httpClient, "close", "close db")
+	kvf.Run(httpClient, "close", "close db") // normally client won't close db, this just demonstrates how it works
 }
 
 func put1() {
